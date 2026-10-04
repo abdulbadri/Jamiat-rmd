@@ -565,6 +565,7 @@ header .nav nav a{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 (function(){
   var firebaseConfig = {
@@ -578,9 +579,11 @@ header .nav nav a{
   try{
     firebase.initializeApp(firebaseConfig);
     window.jamiatDb = firebase.firestore();
+    window.jamiatAuth = firebase.auth();
   }catch(e){
     console.error('Firebase init failed', e);
     window.jamiatDb = null;
+    window.jamiatAuth = null;
   }
 })();
 </script>
@@ -1486,7 +1489,20 @@ html.jt-mobile .admin-table{
 
 <section id="admin" class="admin-dashboard" aria-label="Admin Dashboard">
   <div class="admin-wrap">
-    <h2>Admin Dashboard</h2>
+    <div id="adminLoginGate" style="max-width:380px;margin:40px auto;padding:28px;border:1px solid #ddd;border-radius:16px;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.05)">
+      <h2 style="margin:0 0 6px">Admin Login</h2>
+      <p class="admin-sub" style="margin:0 0 20px">Sign in to access the Admin Dashboard.</p>
+      <form id="adminLoginForm" class="admin-form" style="grid-template-columns:1fr">
+        <div><label>Admin PIN</label><input id="adminLoginPassword" type="password" inputmode="numeric" pattern="[0-9]*" required autocomplete="current-password" placeholder="Enter PIN" style="letter-spacing:4px;font-size:20px;text-align:center;"></div>
+        <div class="admin-form-actions"><button class="admin-action primary" type="submit">Sign In</button></div>
+      </form>
+      <div id="adminLoginError" style="color:#a40000;margin-top:10px;display:none;"></div>
+    </div>
+    <div id="adminAuthedContent" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <h2 style="margin:0">Admin Dashboard</h2>
+      <button class="admin-action" type="button" onclick="adminSignOut()">Sign Out</button>
+    </div>
     <p class="admin-sub">JAMIAT ULAMA RMD — Management Control Panel</p>
     <div class="admin-notify-box" style="margin:0 0 18px;padding:16px;border:1px solid #d9e2ec;border-radius:12px;background:#f8fafc">
       <h3 style="margin:0 0 6px">WhatsApp Notification</h3>
@@ -1645,6 +1661,7 @@ html.jt-mobile .admin-table{
       <div id="subscriptionListBox" class="admin-hidden"><h3>Subscription Status</h3><p class="admin-muted">Active/Expired is calculated automatically from the expiry date.</p><div class="admin-list"><table class="admin-table"><thead><tr><th>Member</th><th>Plan</th><th>Amount</th><th>Payment Date</th><th>Expiry</th><th>Payment</th><th>Current Status</th><th>Actions</th></tr></thead><tbody id="paymentTableBody"></tbody></table></div></div>
     </div>
     <div id="adminStatus" class="admin-status">Select Members Management, Publish or Subscription above.</div>
+    </div>
   </div>
 </section>
 
@@ -2108,6 +2125,54 @@ document.addEventListener('DOMContentLoaded',()=>{
 function openAdminDashboard(){
   const sec=document.getElementById('admin');
   if(sec){sec.classList.add('active');sec.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+(function(){
+  const gate=document.getElementById('adminLoginGate');
+  const authed=document.getElementById('adminAuthedContent');
+  if(window.jamiatAuth){
+    window.jamiatAuth.onAuthStateChanged(function(user){
+      if(user){
+        if(gate)gate.style.display='none';
+        if(authed)authed.style.display='block';
+        const emailEl=document.getElementById('adminLoggedInEmail');
+        if(emailEl)emailEl.textContent=user.email||'';
+      } else {
+        if(gate)gate.style.display='block';
+        if(authed)authed.style.display='none';
+      }
+    });
+  } else {
+    // Firebase Auth unavailable — fail safe by keeping the dashboard locked
+    // rather than silently exposing it.
+    if(authed)authed.style.display='none';
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    const f=document.getElementById('adminLoginForm');
+    if(!f)return;
+    f.addEventListener('submit',function(e){
+      e.preventDefault();
+      const errEl=document.getElementById('adminLoginError');
+      if(errEl){errEl.style.display='none';errEl.textContent='';}
+      if(!window.jamiatAuth){
+        if(errEl){errEl.textContent='Login service is unavailable right now. Please check your internet connection.';errEl.style.display='block';}
+        return;
+      }
+      const ADMIN_FIXED_EMAIL='admin@jamiat-ulama-rmd.firebaseapp.com';
+      const pass=document.getElementById('adminLoginPassword').value.trim();
+      if(!/^[0-9]{6,}$/.test(pass)){
+        if(errEl){errEl.textContent='PIN must be at least 6 digits.';errEl.style.display='block';}
+        return;
+      }
+      window.jamiatAuth.signInWithEmailAndPassword(ADMIN_FIXED_EMAIL,pass).then(function(){
+        f.reset();
+      }).catch(function(err){
+        if(errEl){errEl.textContent='Sign in failed: incorrect PIN.';errEl.style.display='block';}
+      });
+    });
+  });
+})();
+function adminSignOut(){
+  if(window.jamiatAuth)window.jamiatAuth.signOut();
 }
 
 document.addEventListener('DOMContentLoaded',function(){
