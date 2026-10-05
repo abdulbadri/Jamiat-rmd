@@ -1252,6 +1252,128 @@ html.jt-mobile .admin-table{
 }
 </style>
 
+
+<style id="page-wise-navigation-v1">
+/* PAGE-WISE NAVIGATION
+   Shows one public page at a time instead of one very long scrolling page.
+   Existing content and functionality remain in the DOM so existing JS continues to work.
+*/
+html.pagewise-active,
+html.pagewise-active body{
+  overflow-x:hidden !important;
+}
+html.pagewise-active body{
+  min-height:100vh;
+}
+html.pagewise-active body > main#home{
+  display:block !important;
+}
+html.pagewise-active body > main#home > section{
+  display:none !important;
+  min-height:calc(100vh - 125px);
+}
+html.pagewise-active body > main#home > section.pagewise-visible{
+  display:block !important;
+}
+html.pagewise-active body > main#home > section.pagewise-home-part{
+  display:block !important;
+}
+html.pagewise-active body > section.pagewise-visible{
+  display:block !important;
+}
+html.pagewise-active body > section:not(.pagewise-visible){
+  display:none !important;
+}
+html.pagewise-active body > section.admin-dashboard.active,
+html.pagewise-active body > div.join-modal.active,
+html.pagewise-active body > div.join-request-view.active{
+  display:block !important;
+}
+html.pagewise-active body > section.front-dashboard.pagewise-visible,
+html.pagewise-active body > section#ask-imam.pagewise-visible,
+html.pagewise-active body > section[id^="quran"].pagewise-visible,
+html.pagewise-active body > section.pagewise-visible{
+  min-height:calc(100vh - 125px);
+}
+
+/* Keep footer only on the Contact page; this prevents another long page. */
+html.pagewise-active body > footer{
+  display:none !important;
+}
+html.pagewise-active body > footer.pagewise-visible{
+  display:block !important;
+}
+
+/* Small page navigation bar */
+.pagewise-controls{
+  position:fixed;
+  left:50%;
+  bottom:12px;
+  transform:translateX(-50%);
+  z-index:1800;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 9px;
+  background:rgba(17,17,17,.94);
+  color:#fff;
+  border-radius:999px;
+  box-shadow:0 8px 30px rgba(0,0,0,.22);
+  backdrop-filter:blur(8px);
+}
+.pagewise-controls button{
+  min-width:38px;
+  width:38px;
+  height:36px;
+  min-height:36px;
+  padding:0 8px;
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:999px;
+  background:transparent;
+  color:#fff;
+  font-weight:800;
+}
+.pagewise-controls button:hover{
+  background:#fff;
+  color:#111;
+}
+.pagewise-page-title{
+  max-width:180px;
+  padding:0 7px;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.pagewise-counter{
+  font-size:10px;
+  opacity:.72;
+  white-space:nowrap;
+}
+@media(max-width:520px){
+  .pagewise-controls{
+    bottom:8px;
+    gap:5px;
+    padding:6px 7px;
+  }
+  .pagewise-controls button{
+    width:34px;
+    min-width:34px;
+    height:33px;
+    min-height:33px;
+    font-size:12px;
+  }
+  .pagewise-page-title{max-width:125px;font-size:10px}
+  .pagewise-counter{font-size:9px}
+}
+/* Do not interfere with modal scrolling. */
+.join-modal.active,
+.join-request-view.active{
+  overflow:auto !important;
+}
+</style>
+
 </head>
 <body>
 <div class="topbar">
@@ -2964,6 +3086,249 @@ function enableQiblaCompass(){
     if(status)status.textContent='This device/browser does not support a live compass. Use the direction shown above with a separate compass app.';
   }
 }
+</script>
+
+
+<script id="page-wise-navigation-v1-js">
+(function(){
+  'use strict';
+
+  var pages = [
+    {id:'home', title:'Home'},
+    {id:'prayer-times', title:'Prayer Times'},
+    {id:'nearby-masjid', title:'Nearby Masjid'},
+    {id:'qibla', title:'Qibla Finder'},
+    {id:'about', title:'About'},
+    {id:'activities', title:'Activities'},
+    {id:'news', title:'News & Updates'},
+    {id:'events', title:'Events'},
+    {id:'gallery', title:'Gallery'},
+    {id:'about-juh', title:'About Us'},
+    {id:'contact', title:'Contact'},
+    {id:'front-dashboard', title:'Dashboard'},
+    {id:'ask-imam', title:'Ask Imam'},
+    {id:'quran', title:'Quran'},
+    {id:'thafseer', title:'Thafseer'},
+    {id:'vusoolu-thafseer', title:'Vusoolu Thafseer'},
+    {id:'kithab', title:'Kithab'},
+    {id:'vusoolul-hadhees', title:'Vusoolul Hadhees'},
+    {id:'ravi', title:'Ravi'},
+    {id:'fiqh-kithab', title:'Fiqh Kithab'},
+    {id:'vusoolul-fiqh', title:'Vusoolul Fiqh'},
+    {id:'aqaidh', title:'Aqaidh'}
+  ];
+
+  var pageIds = pages.map(function(p){return p.id;});
+  var titles = {};
+  pages.forEach(function(p){titles[p.id]=p.title;});
+
+  function qs(sel){return document.querySelector(sel);}
+  function qsa(sel){return Array.prototype.slice.call(document.querySelectorAll(sel));}
+
+  function prepare(){
+    var root=document.documentElement;
+    root.classList.add('pagewise-active');
+
+    // Give the hero and stats the Home page role.
+    var hero=qs('main#home > section.hero');
+    var stats=qs('main#home > section.stats');
+    if(hero) hero.classList.add('pagewise-home-part');
+    if(stats) stats.classList.add('pagewise-home-part');
+
+    // The CTA is part of Contact.
+    var cta=qs('main#home > section.cta');
+    if(cta) cta.dataset.pagewisePage='contact';
+
+    // Contact includes the footer.
+    var footer=qs('body > footer#contact');
+    if(footer) footer.classList.remove('pagewise-visible');
+
+    // Mark all page elements.
+    pages.forEach(function(p){
+      var el=document.getElementById(p.id);
+      if(el) el.dataset.pagewisePage=p.id;
+    });
+
+    // Existing main#home contains hero/stats plus normal sections.
+    // Home shows only hero + stats.
+    // Contact shows CTA + about-juh + footer.
+    buildControls();
+    showFromHash(false);
+  }
+
+  function getPageFromHash(){
+    var raw=(location.hash||'#home').replace(/^#/,'');
+    if(raw==='') return 'home';
+
+    // Dynamic/legacy aliases.
+    var aliases={
+      'dheen':'quran',
+      'join-us':'front-dashboard',
+      'contact':'contact'
+    };
+    if(aliases[raw]) return aliases[raw];
+
+    // If it is a known page, use it.
+    if(pageIds.indexOf(raw)!==-1) return raw;
+
+    // If a nested element is targeted, open its parent public page.
+    var target=document.getElementById(raw);
+    if(target){
+      var section=target.closest('section');
+      if(section && section.id && pageIds.indexOf(section.id)!==-1) return section.id;
+      if(section && section.closest('main#home')) return 'home';
+    }
+    return 'home';
+  }
+
+  function allPublicPageElements(){
+    var els=[];
+    // Direct body-level public sections.
+    qsa('body > section').forEach(function(el){
+      if(el.id==='admin') return;
+      if(el.classList.contains('front-dashboard') ||
+         el.id==='ask-imam' ||
+         pageIds.indexOf(el.id)!==-1) els.push(el);
+    });
+    // Main children.
+    qsa('main#home > section').forEach(function(el){els.push(el);});
+    return els;
+  }
+
+  function hideEverything(){
+    qsa('body > section').forEach(function(el){
+      if(el.id!=='admin') el.classList.remove('pagewise-visible');
+    });
+    qsa('main#home > section').forEach(function(el){
+      el.classList.remove('pagewise-visible');
+      if(!el.classList.contains('pagewise-home-part')) {
+        el.style.removeProperty('display');
+      }
+    });
+    var footer=qs('body > footer#contact');
+    if(footer) footer.classList.remove('pagewise-visible');
+  }
+
+  function showPage(id, updateHash){
+    if(pageIds.indexOf(id)===-1) id='home';
+
+    hideEverything();
+
+    var main=qs('main#home');
+    var hero=qs('main#home > section.hero');
+    var stats=qs('main#home > section.stats');
+    var cta=qs('main#home > section.cta');
+    var footer=qs('body > footer#contact');
+
+    if(id==='home'){
+      if(hero) hero.classList.add('pagewise-visible');
+      if(stats) stats.classList.add('pagewise-visible');
+    }else if(id==='contact'){
+      if(cta) cta.classList.add('pagewise-visible');
+      var aboutJuh=qs('main#home > section#about-juh');
+      if(aboutJuh) aboutJuh.classList.add('pagewise-visible');
+      if(footer) footer.classList.add('pagewise-visible');
+    }else{
+      var el=document.getElementById(id);
+      if(el){
+        el.classList.add('pagewise-visible');
+      }else{
+        // Safety fallback.
+        if(hero) hero.classList.add('pagewise-visible');
+        if(stats) stats.classList.add('pagewise-visible');
+        id='home';
+      }
+    }
+
+    var title=titles[id]||'Home';
+    var titleEl=qs('.pagewise-page-title');
+    var counterEl=qs('.pagewise-counter');
+    if(titleEl) titleEl.textContent=title;
+    if(counterEl){
+      var idx=pageIds.indexOf(id)+1;
+      counterEl.textContent=idx+'/'+pageIds.length;
+    }
+
+    var prev=qs('.pagewise-prev');
+    var next=qs('.pagewise-next');
+    var idx=pageIds.indexOf(id);
+    if(prev) prev.disabled=(idx<=0);
+    if(next) next.disabled=(idx>=pageIds.length-1);
+
+    // Always start each newly opened page at its top.
+    window.scrollTo(0,0);
+
+    if(updateHash && location.hash !== '#'+id){
+      history.pushState({pagewise:id},'', '#'+id);
+    }
+  }
+
+  function showFromHash(update){
+    showPage(getPageFromHash(), update);
+  }
+
+  function navigate(id){
+    showPage(id,true);
+  }
+
+  function buildControls(){
+    if(qs('.pagewise-controls')) return;
+    var box=document.createElement('div');
+    box.className='pagewise-controls';
+    box.innerHTML=
+      '<button type="button" class="pagewise-prev" aria-label="Previous page">‹</button>'+
+      '<span class="pagewise-page-title">Home</span>'+
+      '<span class="pagewise-counter">1/'+pageIds.length+'</span>'+
+      '<button type="button" class="pagewise-next" aria-label="Next page">›</button>';
+    document.body.appendChild(box);
+
+    box.querySelector('.pagewise-prev').addEventListener('click',function(){
+      var id=getPageFromHash(), i=pageIds.indexOf(id);
+      if(i>0) navigate(pageIds[i-1]);
+    });
+    box.querySelector('.pagewise-next').addEventListener('click',function(){
+      var id=getPageFromHash(), i=pageIds.indexOf(id);
+      if(i<pageIds.length-1) navigate(pageIds[i+1]);
+    });
+  }
+
+  function closestPublicPage(hash){
+    var id=(hash||'').replace(/^#/,'');
+    if(pageIds.indexOf(id)!==-1) return id;
+    var aliases={
+      dheen:'quran',
+      'join-us':'front-dashboard'
+    };
+    if(aliases[id]) return aliases[id];
+    return null;
+  }
+
+  // Intercept normal navigation links, but leave buttons/forms and
+  // special application handlers alone.
+  document.addEventListener('click',function(e){
+    var a=e.target.closest && e.target.closest('a[href^="#"]');
+    if(!a) return;
+    var hash=a.getAttribute('href');
+    // Keep the existing Dheen dropdown and Join Us modal behavior intact.
+    // These links intentionally do not navigate to a page immediately.
+    if(hash==='#dheen' || hash==='#join-us') return;
+
+    var id=closestPublicPage(hash);
+    if(!id) return;
+
+    e.preventDefault();
+    if(a.getAttribute('onclick') && /toggleDheenMenu|toggleDheenSubmenu|selectDheenItem/.test(a.getAttribute('onclick'))){
+      try{ (new Function(a.getAttribute('onclick'))).call(a,e); }catch(_){}
+    }
+    navigate(id);
+  },true);
+
+  window.addEventListener('hashchange',function(){showFromHash(false);});
+  window.addEventListener('popstate',function(){showFromHash(false);});
+
+  document.addEventListener('DOMContentLoaded',prepare);
+  if(document.readyState!=='loading') prepare();
+})();
 </script>
 
 </body>
