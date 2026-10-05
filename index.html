@@ -2442,7 +2442,23 @@ function resetPublishForm(){document.getElementById('publishForm').reset();docum
 function compressImage(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const max=1200,scale=Math.min(1,max/im.width);const c=document.createElement('canvas');c.width=Math.round(im.width*scale);c.height=Math.round(im.height*scale);c.getContext('2d').drawImage(im,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.75))};im.onerror=reject;im.src=r.result};r.onerror=reject;r.readAsDataURL(file)})}
 document.getElementById('publishPhoto').addEventListener('change',async e=>{const f=e.target.files[0],p=document.getElementById('publishPreview');if(!f){p.style.display='none';return}try{const d=await compressImage(f);p.src=d;p.style.display='block';p.dataset.data=d}catch(err){alert('Could not read image.')}})
 document.getElementById('publishForm').addEventListener('submit',async e=>{e.preventDefault();const a=getData('posts');const id=document.getElementById('publishId').value||uid();let photo=document.getElementById('publishPreview').dataset.data||'';const url=document.getElementById('publishPhotoUrl').value.trim();if(url)photo=url;const old=a.find(x=>x.id===id);const obj={id,type:document.getElementById('publishType').value,title:document.getElementById('publishTitle').value.trim(),content:document.getElementById('publishContent').value.trim(),photo,date:old?.date||new Date().toLocaleString()};const i=a.findIndex(x=>x.id===id);if(i>=0)a[i]=obj;else a.unshift(obj);try{setData('posts',a);resetPublishForm();renderPosts();setStatus('Content published successfully.')}catch(err){alert('Storage limit reached. Try a smaller photo.')}})
-function renderPosts(){const tb=document.getElementById('publishTableBody');if(!tb)return;const a=getData('posts');tb.innerHTML=a.length?a.map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.title)}</td><td>${esc(x.content).slice(0,120)}</td><td>${x.photo?`<img src="${esc(x.photo)}" style="width:70px;height:50px;object-fit:cover;border-radius:6px">`:'—'}</td><td>${esc(x.date)}</td><td><button onclick="editPost('${x.id}')">Edit</button><button class="admin-danger" onclick="deletePost('${x.id}')">Delete</button></td></tr>`).join(''):'<tr><td colspan="6" class="admin-muted">No published items.</td></tr>'}
+function renderPosts(){const tb=document.getElementById('publishTableBody');if(!tb)return;const a=getData('posts');tb.innerHTML=a.length?a.map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.title)}</td><td>${esc(x.content).slice(0,120)}</td><td>${x.photo?`<img src="${esc(x.photo)}" style="width:70px;height:50px;object-fit:cover;border-radius:6px">`:'—'}</td><td>${esc(x.date)}</td><td><button onclick="editPost('${x.id}')">Edit</button><button onclick="sharePost('${x.id}')">Share</button><button class="admin-danger" onclick="deletePost('${x.id}')">Delete</button></td></tr>`).join(''):'<tr><td colspan="6" class="admin-muted">No published items.</td></tr>'}
+function sharePost(id){
+  const post=getData('posts').find(x=>x.id===id);
+  if(!post)return;
+  const anchor=post.type==='Photo'?'#gallery':'#news';
+  const url=location.origin+location.pathname+anchor;
+  const text=url+'\n\nJAMIAT ULAMA RMD - '+post.type+'\n\n'+post.title+'\n\n'+post.content;
+  if(navigator.share){
+    navigator.share({title:'JAMIAT ULAMA RMD - '+post.title,text,url}).catch(()=>{});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>alert('Copied to clipboard. You can now paste and share it.')).catch(()=>{
+      window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+    });
+  } else {
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+  }
+}
 function editPost(id){const x=getData('posts').find(v=>v.id===id);if(!x)return;document.getElementById('publishId').value=x.id;document.getElementById('publishType').value=x.type;document.getElementById('publishTitle').value=x.title;document.getElementById('publishContent').value=x.content;const p=document.getElementById('publishPreview');if(x.photo){p.src=x.photo;p.style.display='block';p.dataset.data=x.photo}showPublishTab('publishFormBox',document.querySelector('#publishPanel .admin-tab'));setStatus('Editing published item: '+x.title)}
 function deletePost(id){if(!confirm('Delete this published item?'))return;setData('posts',getData('posts').filter(x=>x.id!==id));renderPosts();setStatus('Published item deleted.')}
 function showDheenTab(id,b){showTab(id,b,'#dheenPanel .admin-tab')}
@@ -2506,10 +2522,10 @@ function renderPublicPublishedContent(){
   const ng=document.getElementById('publicNewsGrid');
   if(ng){
     if(!news.length){ng.innerHTML='<article class="feature"><div class="tag">JAMIAT ULAMA RMD</div><h3>Latest news and announcements will appear here.</h3><p>Administrators can publish News and Announcements from the Admin panel.</p></article>';}
-    else{const first=news[0]; const rest=news.slice(1,5); ng.innerHTML='<article class="feature">'+(first.photo?'<img src="'+esc(first.photo)+'" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:14px">':'')+'<div class="tag">'+esc(first.type)+'</div><h3>'+esc(first.title)+'</h3><p>'+esc(first.content)+'</p><small>'+esc(first.date)+'</small></article><div class="side-news">'+rest.map(x=>'<article class="news-item"><div class="tag">'+esc(x.type)+'</div><h3>'+esc(x.title)+'</h3><p>'+esc(x.content)+'</p></article>').join('')+'</div>'; }
+    else{const first=news[0]; const rest=news.slice(1,5); ng.innerHTML='<article class="feature">'+(first.photo?'<img src="'+esc(first.photo)+'" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:14px">':'')+'<div class="tag">'+esc(first.type)+'</div><h3>'+esc(first.title)+'</h3><p>'+esc(first.content)+'</p><small>'+esc(first.date)+'</small><br><button class="admin-action" style="margin-top:10px;" onclick="sharePost(\''+first.id+'\')">\ud83d\udd17 Share</button></article><div class="side-news">'+rest.map(x=>'<article class="news-item"><div class="tag">'+esc(x.type)+'</div><h3>'+esc(x.title)+'</h3><p>'+esc(x.content)+'</p><button class="admin-action" style="margin-top:8px;" onclick="sharePost(\''+x.id+'\')">\ud83d\udd17 Share</button></article>').join('')+'</div>'; }
   }
   const gg=document.getElementById('publicGalleryGrid');
-  if(gg){gg.innerHTML=photos.length?photos.slice(0,9).map(x=>'<article class="card">'+(x.photo?'<img src="'+esc(x.photo)+'" alt="'+esc(x.title)+'" style="width:100%;height:190px;object-fit:cover;border-radius:12px">':'')+'<h3>'+esc(x.title)+'</h3><p>'+esc(x.content)+'</p></article>').join(''):'<article class="card"><div class="icon">01</div><h3>Gallery</h3><p>Photos published by the administration will appear here.</p></article>';}
+  if(gg){gg.innerHTML=photos.length?photos.slice(0,9).map(x=>'<article class="card">'+(x.photo?'<img src="'+esc(x.photo)+'" alt="'+esc(x.title)+'" style="width:100%;height:190px;object-fit:cover;border-radius:12px">':'')+'<h3>'+esc(x.title)+'</h3><p>'+esc(x.content)+'</p><button class="admin-action" style="margin-top:8px;" onclick="sharePost(\''+x.id+'\')">\ud83d\udd17 Share</button></article>').join(''):'<article class="card"><div class="icon">01</div><h3>Gallery</h3><p>Photos published by the administration will appear here.</p></article>';}
 }
 const _oldRenderPosts=renderPosts; renderPosts=function(){_oldRenderPosts();renderPublicPublishedContent()};
 
